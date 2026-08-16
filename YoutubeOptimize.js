@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Optimizer
 // @namespace    http://tampermonkey.net
-// @version      1.4.1
+// @version      1.4.2
 // @match        https://*.youtube.com/watch*
 // @updateURL    https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
 // @downloadURL  https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
@@ -10,9 +10,6 @@
 
 window.addEventListener('yt-page-data-updated', function() {
     console.log("Tampermonkey: YouTube Fixer Loaded");
-
-    // 1度だけ実行するためのフラグ
-    let isInitialSettingsDone = false;
 
     const p = document.getElementById('movie_player');
     if (p) {
@@ -28,18 +25,6 @@ window.addEventListener('yt-page-data-updated', function() {
         }
     }
 
-    // 字幕ボタンをチェックしてオフにする関数
-    function disableCaptions() {
-        const ccButton = document.querySelector('.ytp-subtitles-button');
-        if (ccButton) {
-            const isEnabled = ccButton.getAttribute('aria-pressed') === 'true';
-            if (isEnabled) {
-                ccButton.click();
-                console.log('[Auto Disable Captions] 字幕をオフにしました。');
-            }
-        }
-    }
-
     // 左右カーソルキーが押されたときに再生ボタンにフォーカスするイベントリスナー
     const handleKeyDown = function(e) {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -51,35 +36,56 @@ window.addEventListener('yt-page-data-updated', function() {
         }
     };
 
-    // 古いリスナーがあれば一度削除して重複登録を防ぐ
+    // 古いリスナーを削除して重複登録を防止
     window.removeEventListener('keydown', handleKeyDown);
     window.addEventListener('keydown', handleKeyDown);
 
+    // 状態を追跡するフラグ（確実にオフが適用されたら true にする）
+    let isCaptionsSuccessfullyDisabled = false;
+    let isAutoplaySuccessfullyDisabled = false;
+
+    // 画面監視 (MutationObserver)
     const observer = new MutationObserver(() => {
-        // 既に初期設定が完了している場合は何もしない
-        if (isInitialSettingsDone) return;
-
-        const ccButton = document.querySelector('.ytp-subtitles-button');
-        const autoPlayButton = document.querySelector('button.ytp-button[data-tooltip-target-id="ytp-autonav-toggle-button"]');
-
-        // 字幕ボタンと自動再生ボタンが両方見つかった（＝プレイヤーの読み込みが完了した）タイミング
-        if (ccButton && autoPlayButton) {
-            // 1. 字幕オフ
-            disableCaptions();
-
-            // 2. 自動再生オフ
-            const label = autoPlayButton.getAttribute('aria-label');
-            if (label && (label.includes("オン") || label.includes("on"))) {
-                autoPlayButton.click();
-                console.log("Tampermonkey: Autoplay disabled");
-            }
-
-            // フラグをtrueにして、以降の監視処理をスキップ
-            isInitialSettingsDone = true;
-            console.log("Tampermonkey: 初期設定（字幕・自動再生オフ）が完了しました");
-            
-            // 設定が終わったらObserverを停止してブラウザの負荷を減らす
+        // 両方のオフ設定が成功していれば、監視を終了してブラウザの負荷を下げる
+        if (isCaptionsSuccessfullyDisabled && isAutoplaySuccessfullyDisabled) {
+            console.log("Tampermonkey: すべての初期設定が適用されました。監視を終了します。");
             observer.disconnect();
+            return;
+        }
+
+        // 1. 字幕オフの処理
+        if (!isCaptionsSuccessfullyDisabled) {
+            const ccButton = document.querySelector('.ytp-subtitles-button');
+            if (ccButton) {
+                const isEnabled = ccButton.getAttribute('aria-pressed') === 'true';
+                if (isEnabled) {
+                    ccButton.click();
+                    console.log('[Auto Disable Captions] 字幕をオフにするクリックを実行しました。');
+                } else if (ccButton.getAttribute('aria-pressed') === 'false') {
+                    // 確実にオフ（false）になっていることを確認できたら、この処理は完了
+                    isCaptionsSuccessfullyDisabled = true;
+                    console.log('[Auto Disable Captions] 字幕がオフであることを確認しました。');
+                }
+            }
+        }
+
+        // 2. 自動再生オフの処理
+        if (!isAutoplaySuccessfullyDisabled) {
+            const autoPlayButton = document.querySelector('.ytp-autonav-toggle-button, [data-tooltip-target-id="ytp-autonav-toggle-button"]');
+            if (autoPlayButton) {
+                const label = autoPlayButton.getAttribute('aria-label') || '';
+                const checked = autoPlayButton.getAttribute('aria-checked');
+
+                // オン状態（true、またはラベルにオンが含まれる）ならクリック
+                if (checked === "true" || label.includes("オン") || label.includes("on")) {
+                    autoPlayButton.click();
+                    console.log("Tampermonkey: 自動再生をオフにするクリックを実行しました。");
+                } else if (checked === "false" || label.includes("オフ") || label.includes("off")) {
+                    // 確実にオフ（false）になっていることを確認できたら、この処理は完了
+                    isAutoplaySuccessfullyDisabled = true;
+                    console.log("Tampermonkey: 自動再生がオフであることを確認しました。");
+                }
+            }
         }
     });
 

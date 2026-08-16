@@ -11,6 +11,9 @@
 window.addEventListener('yt-page-data-updated', function() {
     console.log("Tampermonkey: YouTube Fixer Loaded");
 
+    // 1度だけ実行するためのフラグ
+    let isInitialSettingsDone = false;
+
     const p = document.getElementById('movie_player');
     if (p) {
         // 音量チェック (70%制限)
@@ -27,11 +30,8 @@ window.addEventListener('yt-page-data-updated', function() {
 
     // 字幕ボタンをチェックしてオフにする関数
     function disableCaptions() {
-        // YouTubeの字幕ボタン（CCボタン）を取得
         const ccButton = document.querySelector('.ytp-subtitles-button');
-
         if (ccButton) {
-            // ytp-subtitles-button が 'true'（オン状態）のときだけクリックしてオフにする
             const isEnabled = ccButton.getAttribute('aria-pressed') === 'true';
             if (isEnabled) {
                 ccButton.click();
@@ -40,29 +40,46 @@ window.addEventListener('yt-page-data-updated', function() {
         }
     }
 
-    const observer = new MutationObserver(() => {
-        // プレイヤーが存在し、動画が読み込まれたタイミングで実行
-        //字幕オフ
-        if (document.querySelector('.ytp-subtitles-button')) {
-            disableCaptions();
+    // 左右カーソルキーが押されたときに再生ボタンにフォーカスするイベントリスナー
+    const handleKeyDown = function(e) {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            const playButton = document.querySelector('.ytp-play-button');
+            if (playButton) {
+                playButton.focus();
+                console.log('Tampermonkey: 左右キーが押されたため再生ボタンにフォーカスしました');
+            }
         }
-        // 自動再生オフの強制
-        // 自動再生ボタンの aria-label が "自動再生はオンです" の場合にクリック
+    };
+
+    // 古いリスナーがあれば一度削除して重複登録を防ぐ
+    window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+
+    const observer = new MutationObserver(() => {
+        // 既に初期設定が完了している場合は何もしない
+        if (isInitialSettingsDone) return;
+
+        const ccButton = document.querySelector('.ytp-subtitles-button');
         const autoPlayButton = document.querySelector('button.ytp-button[data-tooltip-target-id="ytp-autonav-toggle-button"]');
-        const playButton = document.querySelector('.ytp-play-button');
-        if (autoPlayButton) {
+
+        // 字幕ボタンと自動再生ボタンが両方見つかった（＝プレイヤーの読み込みが完了した）タイミング
+        if (ccButton && autoPlayButton) {
+            // 1. 字幕オフ
+            disableCaptions();
+
+            // 2. 自動再生オフ
             const label = autoPlayButton.getAttribute('aria-label');
             if (label && (label.includes("オン") || label.includes("on"))) {
                 autoPlayButton.click();
                 console.log("Tampermonkey: Autoplay disabled");
             }
-        }
-        if (playButton) {
-            // フォーカスを当てる
-            playButton.focus();
-            console.log('再生ボタンにフォーカスしました');
-        } else {
-            console.log('再生ボタンが見つかりませんでした');
+
+            // フラグをtrueにして、以降の監視処理をスキップ
+            isInitialSettingsDone = true;
+            console.log("Tampermonkey: 初期設定（字幕・自動再生オフ）が完了しました");
+            
+            // 設定が終わったらObserverを停止してブラウザの負荷を減らす
+            observer.disconnect();
         }
     });
 

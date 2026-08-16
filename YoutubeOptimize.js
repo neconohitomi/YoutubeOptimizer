@@ -3,8 +3,8 @@
 // @namespace    http://tampermonkey.net
 // @version      1.4
 // @match        https://*.youtube.com/watch*
-// @updateURL    https://github.com/neconohitomi/YoutubeOptimizer/blob/main/YoutubeOptimize.js
-// @downloadURL  https://github.com/neconohitomi/YoutubeOptimizer/blob/main/YoutubeOptimize.js
+// @updateURL    https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
+// @downloadURL  https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
 // @description 字幕オフ、360p固定、音量70%制限、自動再生オフ
 // ==/UserScript==
 

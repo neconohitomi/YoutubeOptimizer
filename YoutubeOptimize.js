@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         YouTube Optimizer
 // @namespace    http://tampermonkey.net
-// @version      1.4.2
+// @version      1.4.3
 // @match        https://*.youtube.com/watch*
 // @updateURL    https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
 // @downloadURL  https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
 // @description 字幕オフ、360p固定、音量70%制限、自動再生オフ
 // ==/UserScript==
+
+/*
+new 1.4.3
+*/
 
 window.addEventListener('yt-page-data-updated', function() {
     console.log("Tampermonkey: YouTube Fixer Loaded");

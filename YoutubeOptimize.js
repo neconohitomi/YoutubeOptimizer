@@ -5,7 +5,7 @@
 // @match        https://*.youtube.com/watch*
 // @updateURL    https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
 // @downloadURL  https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
-// @description 字幕オフ、360p固定、音量70%制限、自動再生オフ
+// @description 字幕オフ、360p固定、音量50%制限、自動再生オフ
 // ==/UserScript==
 
 /*

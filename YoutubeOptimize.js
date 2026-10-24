@@ -1,101 +1,168 @@
 // ==UserScript==
 // @name         YouTube Optimizer
 // @namespace    http://tampermonkey.net
-// @version      1.4.4
-// @match        https://*.youtube.com/watch*
 // @updateURL    https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
 // @downloadURL  https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
-// @description 字幕オフ、360p固定、音量50%制限、自動再生オフ
+// @version      2.0.0
+// @match        https://www.youtube.com/*
+// @run-at       document-idle
+// @grant        none
+// @description 字幕オフ、360p固定、音量50%制限、自動再生オフ、左右キーで再生ボタンにフォーカス
 // ==/UserScript==
 
-/*
-2026/10/24　14：37
-*/
+(() => {
+    'use strict';
 
-window.addEventListener('yt-page-data-updated', function() {
-    console.log("Tampermonkey: YouTube Fixer Loaded");
+    const TARGET_VOLUME = 50;
+    const TARGET_QUALITY = 'medium';
+    const RETRY_INTERVAL_MS = 500;
+    const MAX_RETRIES = 20;
 
-    const p = document.getElementById('movie_player');
-    if (p) {
-        // 音量チェック (70%制限)
-        if (p.getVolume() > 70) {
-            console.log("Tampermonkey: Set Volume 70");
-            p.setVolume(50);
-        }
-        // 画質チェック (medium = 360p)
-        if (p.getPlaybackQuality() !== 'medium') {
-            console.log("Tampermonkey: Set Quality medium");
-            p.setPlaybackQualityRange('medium', 'medium');
+    let retryTimer = null;
+    let retryCount = 0;
+    let captionsClickPending = false;
+    let autoplayClickPending = false;
+
+    function getPlayer() {
+        return document.getElementById('movie_player');
+    }
+
+    function applyVolume(player) {
+        try {
+            const volume = player?.getVolume?.();
+            if (typeof volume !== 'number') return;
+
+            // 音量の上限を50%にする
+            if (volume > TARGET_VOLUME) {
+                player.setVolume(TARGET_VOLUME);
+                console.log(`[YouTube Optimizer] 音量を${TARGET_VOLUME}%に制限しました。`);
+            }
+
+            // 常に50%に設定したい場合は、上の if ブロックを次に置き換えてください:
+            // if (volume !== TARGET_VOLUME) player.setVolume(TARGET_VOLUME);
+        } catch (error) {
+            console.debug('[YouTube Optimizer] 音量を設定できませんでした。', error);
         }
     }
 
-    // 左右カーソルキーが押されたときに再生ボタンにフォーカスするイベントリスナー
-    const handleKeyDown = function(e) {
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-            const playButton = document.querySelector('.ytp-play-button');
-            if (playButton) {
-                playButton.focus();
-                console.log('Tampermonkey: 左右キーが押されたため再生ボタンにフォーカスしました');
+    function applyQuality(player) {
+        try {
+            // YouTube内部の非公開メソッドです。存在する場合だけ要求します。
+            if (typeof player?.setPlaybackQualityRange === 'function') {
+                player.setPlaybackQualityRange(TARGET_QUALITY, TARGET_QUALITY);
+            }
+        } catch (error) {
+            console.debug('[YouTube Optimizer] 画質を設定できませんでした。', error);
+        }
+    }
+
+    function disableCaptions() {
+        const button = document.querySelector('.ytp-subtitles-button');
+        if (!button) return false;
+
+        const state = button.getAttribute('aria-pressed');
+
+        if (state === 'false') {
+            captionsClickPending = false;
+            return true;
+        }
+
+        if (state === 'true' && !captionsClickPending) {
+            captionsClickPending = true;
+            button.click();
+            console.log('[YouTube Optimizer] 字幕オフを要求しました。');
+
+            // 状態更新が反映されない場合は、次の試行で再確認できるようにする
+            setTimeout(() => {
+                captionsClickPending = false;
+            }, 1500);
+        }
+
+        return false;
+    }
+
+    function disableAutoplay() {
+        const button = document.querySelector(
+            '.ytp-autonav-toggle-button, ' +
+            'button[data-tooltip-target-id="ytp-autonav-toggle-button"]'
+        );
+
+        if (!button) return false;
+
+        // aria-checked はスイッチ本体側にある場合と、親要素側にある場合があります
+        const stateElement = button.matches('[aria-checked]')
+            ? button
+            : button.querySelector('[aria-checked]') ||
+              button.closest('[aria-checked]');
+
+        const state = stateElement?.getAttribute('aria-checked');
+
+        if (state === 'false') {
+            autoplayClickPending = false;
+            return true;
+        }
+
+        if (state === 'true' && !autoplayClickPending) {
+            autoplayClickPending = true;
+            button.click();
+            console.log('[YouTube Optimizer] 自動再生オフを要求しました。');
+
+            setTimeout(() => {
+                autoplayClickPending = false;
+            }, 1500);
+        }
+
+        return false;
+    }
+
+    function applySettings() {
+        const player = getPlayer();
+
+        if (player) {
+            applyVolume(player);
+            applyQuality(player);
+        }
+
+        const captionsOff = disableCaptions();
+        const autoplayOff = disableAutoplay();
+
+        retryCount++;
+
+        if ((captionsOff && autoplayOff) || retryCount >= MAX_RETRIES) {
+            clearInterval(retryTimer);
+            retryTimer = null;
+
+            if (retryCount >= MAX_RETRIES && !(captionsOff && autoplayOff)) {
+                console.warn('[YouTube Optimizer] 一部の設定を確認できませんでした。');
             }
         }
-    };
+    }
 
-    // 古いリスナーを削除して重複登録を防止
-    window.removeEventListener('keydown', handleKeyDown);
-    window.addEventListener('keydown', handleKeyDown);
+    function startForCurrentVideo() {
+        clearInterval(retryTimer);
 
-    // 状態を追跡するフラグ（確実にオフが適用されたら true にする）
-    let isCaptionsSuccessfullyDisabled = false;
-    let isAutoplaySuccessfullyDisabled = false;
+        retryCount = 0;
+        captionsClickPending = false;
+        autoplayClickPending = false;
 
-    // 画面監視 (MutationObserver)
-    const observer = new MutationObserver(() => {
-        // 両方のオフ設定が成功していれば、監視を終了してブラウザの負荷を下げる
-        if (isCaptionsSuccessfullyDisabled && isAutoplaySuccessfullyDisabled) {
-            console.log("Tampermonkey: すべての初期設定が適用されました。監視を終了します。");
-            observer.disconnect();
-            return;
+        // すぐに一度実行し、その後はボタンが現れるまで短時間再試行
+        applySettings();
+        retryTimer = setInterval(applySettings, RETRY_INTERVAL_MS);
+    }
+
+    // 初回表示とYouTube内の動画遷移に対応
+    startForCurrentVideo();
+    document.addEventListener('yt-navigate-finish', startForCurrentVideo);
+    document.addEventListener('yt-page-data-updated', startForCurrentVideo);
+
+    // 左右キーで再生ボタンにフォーカス
+    window.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+
+        const playButton = document.querySelector('.ytp-play-button');
+        if (playButton) {
+            playButton.focus();
+            console.log('[YouTube Optimizer] 再生ボタンにフォーカスしました。');
         }
-
-        // 1. 字幕オフの処理
-        if (!isCaptionsSuccessfullyDisabled) {
-            const ccButton = document.querySelector('.ytp-subtitles-button');
-            if (ccButton) {
-                const isEnabled = ccButton.getAttribute('aria-pressed') === 'true';
-                if (isEnabled) {
-                    ccButton.click();
-                    console.log('[Auto Disable Captions] 字幕をオフにするクリックを実行しました。');
-                } else if (ccButton.getAttribute('aria-pressed') === 'false') {
-                    // 確実にオフ（false）になっていることを確認できたら、この処理は完了
-                    isCaptionsSuccessfullyDisabled = true;
-                    console.log('[Auto Disable Captions] 字幕がオフであることを確認しました。');
-                }
-            }
-        }
-
-        // 2. 自動再生オフの処理
-        if (!isAutoplaySuccessfullyDisabled) {
-            const autoPlayButton = document.querySelector('.ytp-autonav-toggle-button, [data-tooltip-target-id="ytp-autonav-toggle-button"]');
-            if (autoPlayButton) {
-                const label = autoPlayButton.getAttribute('aria-label') || '';
-                const checked = autoPlayButton.getAttribute('aria-checked');
-
-                // オン状態（true、またはラベルにオンが含まれる）ならクリック
-                if (checked === "true" || label.includes("オン") || label.includes("on")) {
-                    autoPlayButton.click();
-                    console.log("Tampermonkey: 自動再生をオフにするクリックを実行しました。");
-                } else if (checked === "false" || label.includes("オフ") || label.includes("off")) {
-                    // 確実にオフ（false）になっていることを確認できたら、この処理は完了
-                    isAutoplaySuccessfullyDisabled = true;
-                    console.log("Tampermonkey: 自動再生がオフであることを確認しました。");
-                }
-            }
-        }
-    });
-
-    // 監視を開始
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-});
+    }, true);
+})();

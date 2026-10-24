@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Optimizer
 // @namespace    http://tampermonkey.net
-// @version      1.4.3
+// @version      1.4.4
 // @match        https://*.youtube.com/watch*
 // @updateURL    https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
 // @downloadURL  https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
@@ -9,7 +9,7 @@
 // ==/UserScript==
 
 /*
-new 1.4.3
+2026/10/24　14：37
 */
 
 window.addEventListener('yt-page-data-updated', function() {
@@ -20,7 +20,7 @@ window.addEventListener('yt-page-data-updated', function() {
         // 音量チェック (70%制限)
         if (p.getVolume() > 70) {
             console.log("Tampermonkey: Set Volume 70");
-            p.setVolume(70);
+            p.setVolume(50);
         }
         // 画質チェック (medium = 360p)
         if (p.getPlaybackQuality() !== 'medium') {

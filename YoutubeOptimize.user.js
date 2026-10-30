@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         YouTube Optimizer
 // @namespace    http://tampermonkey.net
-// @updateURL    https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
-// @downloadURL  https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.js
-// @version      2.0.0
+// @updateURL    https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.user.js
+// @downloadURL  https://raw.githubusercontent.com/neconohitomi/YoutubeOptimizer/refs/heads/main/YoutubeOptimize.user.js
+// @version      2.0.1
 // @match        https://www.youtube.com/*
 // @run-at       document-idle
 // @grant        none
